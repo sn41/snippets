@@ -285,10 +285,11 @@ fun AnimateOffset() {
             .padding(16.dp)
     ) {
         // [START android_compose_animation_offset_change]
-        var moved by remember { mutableStateOf(false) }
+
         val pxToMove = with(LocalDensity.current) {
             100.dp.toPx().roundToInt()
         }
+        var moved by remember { mutableStateOf(false) }
         val offset by animateIntOffsetAsState(
             targetValue = if (moved) {
                 IntOffset(pxToMove, pxToMove)

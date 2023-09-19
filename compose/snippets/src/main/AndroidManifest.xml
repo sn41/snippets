@@ -32,7 +32,8 @@
             android:name=".SnippetsActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.Snippets">
+            android:theme="@style/Theme.Snippets"
+            android:enableOnBackInvokedCallback="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

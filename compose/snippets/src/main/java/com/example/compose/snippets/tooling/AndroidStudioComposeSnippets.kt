@@ -28,13 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Device
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.tooling.preview.UiMode
-import androidx.compose.ui.tooling.preview.Wallpaper
 import androidx.compose.ui.tooling.preview.Wallpapers
 import com.example.compose.snippets.R
 import com.example.compose.snippets.interop.User
@@ -189,8 +187,8 @@ private object PreviewAnnotationEx {
         val showBackground: Boolean = false,
         val backgroundColor: Long = 0,
         @UiMode val uiMode: Int = 0,
-        @Device val device: String = Devices.DEFAULT,
-        @Wallpaper val wallpaper: Int = Wallpapers.NONE,
+     //   @Device val device: String = Devices.DEFAULT,
+       // @Wallpaper val wallpaper: Int = Wallpapers.NONE,
     )
 // [END android_compose_tooling_preview_annotation]
 }

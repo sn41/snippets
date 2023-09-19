@@ -44,6 +44,7 @@ import com.example.compose.snippets.images.ImageExamplesScreen
 import com.example.compose.snippets.landing.LandingScreen
 import com.example.compose.snippets.navigation.Destination
 import com.example.compose.snippets.navigation.TopComponentsDestination
+import com.example.compose.snippets.system.PredictiveBackExample_NoNavigationLibrary
 import com.example.compose.snippets.ui.theme.SnippetsTheme
 import com.example.topcomponents.CardExamples
 
@@ -75,6 +76,7 @@ class SnippetsActivity : ComponentActivity() {
                                             it.route
                                         )
                                     }
+                                    Destination.PredictiveBackExample -> PredictiveBackExample_NoNavigationLibrary()
                                 }
                             }
                         }
