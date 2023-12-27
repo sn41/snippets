@@ -22,18 +22,24 @@ import android.content.Intent
 import android.content.Intent.createChooser
 import android.graphics.Bitmap
 import android.graphics.Picture
+import android.graphics.RenderNode
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.FloatingActionButton
@@ -44,25 +50,32 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.draw
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.node.Ref
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat.startActivity
+import androidx.graphics.CanvasBufferedRenderer
 import com.example.compose.snippets.R
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -197,7 +210,8 @@ private fun ScreenContentToCapture() {
             contentDescription = null,
             modifier = Modifier
                 .aspectRatio(1f)
-                .padding(32.dp),
+                .padding(32.dp)
+                .shadow(8.dp),
             contentScale = ContentScale.Crop
         )
         Text(
@@ -272,3 +286,142 @@ private fun shareBitmap(context: Context, uri: Uri) {
     }
     startActivity(context, createChooser(intent, "Share your image"), null)
 }
+
+@RequiresApi(Build.VERSION_CODES.Q)
+@Composable
+fun ScreenshotExample(
+    onScreenshotComplete: (ImageBitmap) -> Unit,
+    content: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+    val bufferedRenderer = remember { Ref<CanvasBufferedRenderer?>() }
+    Box(
+        modifier = Modifier
+            .wrapContentSize()
+            .drawWithCache {
+                val width = size.width.toInt()
+                val height = size.height.toInt()
+                val contentNode = RenderNode("node").apply {
+                    setPosition(0, 0, width, height)
+                }
+
+                bufferedRenderer.value?.close()
+                val renderer = CanvasBufferedRenderer
+                    .Builder(width, height)
+                    .setMaxBuffers(1)
+                    .build()
+                    .apply {
+                        setContentRoot(contentNode)
+                    }
+
+                bufferedRenderer.value = renderer
+
+
+                onDrawWithContent {
+                    val contentCanvas = contentNode.beginRecording()
+                    draw(
+                        this,
+                        this.layoutDirection,
+                        androidx.compose.ui.graphics.Canvas(contentCanvas),
+                        this.size
+                    ) {
+                        this@onDrawWithContent.drawContent()
+                    }
+                    contentNode.endRecording()
+
+                    renderer
+                        .obtainRenderRequest()
+                        .drawAsync(context.mainExecutor) { result ->
+                            // Always wait on the fence before consuming contents of the buffer
+                            result.fence?.awaitForever()
+                            val buffer = result.hardwareBuffer
+                            onScreenshotComplete(
+                                Bitmap
+                                    .wrapHardwareBuffer(buffer, null)!!
+                                    .asImageBitmap()
+                            )
+                        }
+
+                    drawIntoCanvas { canvas ->
+                        canvas.nativeCanvas.drawRenderNode(contentNode)
+                    }
+                }
+            }
+    ) {
+        content()
+    }
+
+    DisposableEffect(bufferedRenderer) {
+        onDispose {
+            bufferedRenderer.value?.close()
+        }
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+@RequiresApi(Build.VERSION_CODES.Q)
+@Composable
+fun BufferedRendererScreenshotExample() {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val imageBitmap = remember { mutableStateOf<ImageBitmap?>(null, referentialEqualityPolicy()) }
+
+    val writeStorageAccessState = rememberMultiplePermissionsState(
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // No permissions are needed on Android 10+ to add files in the shared storage
+            emptyList()
+        } else {
+            listOf(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    )
+    // This logic should live in your ViewModel - trigger a side effect to invoke URI sharing.
+    // checks permissions granted, and then saves the bitmap from a Picture that is already capturing content
+    // and shares it with the default share sheet.
+    fun shareBitmapFromComposable() {
+        if (writeStorageAccessState.allPermissionsGranted) {
+            coroutineScope.launch {
+                val uri = imageBitmap.value!!.asAndroidBitmap().saveToDisk(context)
+                shareBitmap(context, uri)
+            }
+        } else if (writeStorageAccessState.shouldShowRationale) {
+            coroutineScope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = "The storage permission is needed to save the image",
+                    actionLabel = "Grant Access"
+                )
+
+                if (result == SnackbarResult.ActionPerformed) {
+                    writeStorageAccessState.launchMultiplePermissionRequest()
+                }
+            }
+        } else {
+            writeStorageAccessState.launchMultiplePermissionRequest()
+        }
+    }
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                shareBitmapFromComposable()
+            }) {
+                Icon(Icons.Default.Share, "share")
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .wrapContentSize()
+        ) {
+            ScreenshotExample({ bitmap ->
+                imageBitmap.value = bitmap
+            }) {
+                ScreenContentToCapture()
+            }
+        }
+    }
+}
+

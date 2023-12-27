@@ -16,6 +16,7 @@
 
 package com.example.compose.snippets
 
+import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
 import androidx.activity.ComponentActivity
@@ -40,6 +41,7 @@ import com.example.compose.snippets.components.SliderExamples
 import com.example.compose.snippets.components.SwitchExamples
 import com.example.compose.snippets.graphics.BitmapFromComposableSnippet
 import com.example.compose.snippets.graphics.BrushExamplesScreen
+import com.example.compose.snippets.graphics.BufferedRendererScreenshotExample
 import com.example.compose.snippets.images.ImageExamplesScreen
 import com.example.compose.snippets.landing.LandingScreen
 import com.example.compose.snippets.navigation.Destination
@@ -63,13 +65,17 @@ class SnippetsActivity : ComponentActivity() {
                         composable("LandingScreen") {
                             LandingScreen { navController.navigate(it.route) }
                         }
-                        Destination.values().forEach { destination ->
+                        Destination.entries.forEach { destination ->
                             composable(destination.route) {
                                 when (destination) {
                                     Destination.BrushExamples -> BrushExamplesScreen()
                                     Destination.ImageExamples -> ImageExamplesScreen()
                                     Destination.AnimationQuickGuideExamples -> AnimationExamplesScreen()
-                                    Destination.ScreenshotExample -> BitmapFromComposableSnippet()
+                                    Destination.ScreenshotExample -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        BufferedRendererScreenshotExample()
+                                    } else {
+                                        BitmapFromComposableSnippet()
+                                    }
                                     Destination.ComponentsExamples -> ComponentsScreen {
                                         navController.navigate(
                                             it.route
@@ -78,7 +84,7 @@ class SnippetsActivity : ComponentActivity() {
                                 }
                             }
                         }
-                        TopComponentsDestination.values().forEach { destination ->
+                        TopComponentsDestination.entries.forEach { destination ->
                             composable(destination.route) {
                                 when (destination) {
                                     TopComponentsDestination.CardExamples -> CardExamples()
